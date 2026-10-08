@@ -133,3 +133,12 @@ def authority_status(
             if site["pollutants_status"] != NO_SPECIES_DATA
         ]
     )
+
+
+def data_status(site_data: list[dict[str, Any]]) -> str:
+    """Return a short status describing data availability for an authority."""
+    if not site_data:
+        return "no_sites"
+    if all(site["pollutants_status"] == NO_SPECIES_DATA for site in site_data):
+        return "no_readings"
+    return "ok"

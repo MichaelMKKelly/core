@@ -34,6 +34,7 @@ async def test_sensor_state(
     assert state.state == "Low"
     assert state.attributes["sites"] == 2
     assert state.attributes["updated"] == "2017-08-03 03:00:00"
+    assert state.attributes["data_status"] == "ok"
 
 
 async def test_sensor_unavailable(
