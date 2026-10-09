@@ -62,6 +62,7 @@ class LondonAirSensor(CoordinatorEntity[LondonAirDataUpdateCoordinator], SensorE
         self._attr_extra_state_attributes = {
             "sites": len(site_data),
             "updated": site_data[0]["updated"] if site_data else None,
+            "data": site_data,
             "data_status": data_status(site_data),
         }
 
