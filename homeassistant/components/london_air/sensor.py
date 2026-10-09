@@ -25,6 +25,7 @@ from .coordinator import (
     LondonAirConfigEntry,
     LondonAirDataUpdateCoordinator,
     authority_status,
+    data_status,
 )
 
 # Coordinator is used to centralize the data updates
@@ -126,6 +127,7 @@ class LondonAirSensor(CoordinatorEntity[LondonAirDataUpdateCoordinator], SensorE
             "sites": len(site_data),
             "updated": site_data[0]["updated"] if site_data else None,
             "data": site_data,
+            "data_status": data_status(site_data),
         }
 
     @callback
