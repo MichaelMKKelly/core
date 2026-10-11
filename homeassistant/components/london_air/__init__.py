@@ -41,6 +41,7 @@ def _remove_stale_entries(hass: HomeAssistant, entry: LondonAirConfigEntry) -> N
         device_registry, entry.entry_id
     ):
         if not any(
-            identifier[1] in locations for identifier in device_entry.identifiers
+            identifier[0] == entry.domain and identifier[1] in locations
+            for identifier in device_entry.identifiers
         ):
             device_registry.async_remove_device(device_entry.id)
