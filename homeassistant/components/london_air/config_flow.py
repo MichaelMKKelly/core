@@ -76,13 +76,11 @@ class LondonAirConfigFlow(ConfigFlow, domain=DOMAIN):
         try:
             entry = await self.async_set_unique_id(DOMAIN)
         except AbortFlow:
-            # A concurrent import is creating the entry; merge this
-            # block's locations into it once it exists.
-            self.hass.async_create_task(
-                self._async_merge_when_ready(import_config),
-                f"{DOMAIN} merge yaml import",
+            # A concurrent import is creating the entry; wait for its
+            # outcome so this block reports the same result.
+            return self.async_abort(
+                reason=await self._async_await_creator_outcome(import_config)
             )
-            return self.async_abort(reason="already_configured")
         if entry is not None:
             self._merge_import_locations(entry, import_config)
             return self.async_abort(reason="already_configured")
@@ -110,14 +108,16 @@ class LondonAirConfigFlow(ConfigFlow, domain=DOMAIN):
             )
             self.hass.config_entries.async_schedule_reload(entry.entry_id)
 
-    async def _async_merge_when_ready(self, import_config: Mapping[str, Any]) -> None:
-        """Merge imported locations once a concurrent import creates the entry."""
+    async def _async_await_creator_outcome(
+        self, import_config: Mapping[str, Any]
+    ) -> str:
+        """Wait for the concurrent import's outcome and return the abort reason."""
         loop = asyncio.get_running_loop()
         # Two sequential REQUEST_TIMEOUT-bounded requests (connection test and
         # first refresh) can elapse while the entry stays SETUP_IN_PROGRESS;
         # add a margin so we do not give up just before the entry is ready.
         deadline = loop.time() + 2 * (REQUEST_TIMEOUT.total or 10.0) + 5.0
-        while loop.time() < deadline:
+        while True:
             entry = self.hass.config_entries.async_entry_for_domain_unique_id(
                 DOMAIN, DOMAIN
             )
@@ -126,8 +126,22 @@ class LondonAirConfigFlow(ConfigFlow, domain=DOMAIN):
                 and entry.state is not ConfigEntryState.SETUP_IN_PROGRESS
             ):
                 self._merge_import_locations(entry, import_config)
-                return
+                return "already_configured"
+            if entry is None and not self._creator_flow_in_progress():
+                # The concurrent import finished without creating an entry.
+                return "cannot_connect"
+            if loop.time() >= deadline:
+                return "cannot_connect"
             await asyncio.sleep(0.1)
+
+    def _creator_flow_in_progress(self) -> bool:
+        """Return True if another flow for this domain is still running."""
+        return any(
+            flow["flow_id"] != self.flow_id and flow["handler"] == DOMAIN
+            for flow in self.hass.config_entries.flow.async_progress(
+                include_uninitialized=True
+            )
+        )
 
     async def async_step_reconfigure(
         self, user_input: dict[str, Any] | None = None

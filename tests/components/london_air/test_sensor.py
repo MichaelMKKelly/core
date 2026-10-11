@@ -340,3 +340,50 @@ async def test_yaml_migration_multiple_blocks(
 
     assert hass.states.get("sensor.merton") is not None
     assert hass.states.get("sensor.city_of_london") is not None
+
+
+@pytest.mark.parametrize("delay", [0, 0.5], ids=["instant", "slow_setup"])
+async def test_yaml_migration_multiple_blocks_import_failure(
+    hass: HomeAssistant,
+    issue_registry: ir.IssueRegistry,
+    mock_session: MagicMock,
+    delay: float,
+) -> None:
+    """Test concurrent YAML blocks report the import failure when the API is down."""
+
+    async def _get(*args: Any, **kwargs: Any) -> Any:
+        # Yield so both import flows run concurrently before the API fails.
+        await asyncio.sleep(delay)
+        raise ClientConnectorError(Mock(), OSError("test"))
+
+    mock_session.get.side_effect = _get
+
+    assert await async_setup_component(
+        hass,
+        "sensor",
+        {
+            "sensor": [
+                {"platform": "london_air", "locations": ["Merton"]},
+                {"platform": "london_air", "locations": ["City of London"]},
+            ]
+        },
+    )
+    await hass.async_block_till_done()
+
+    assert hass.config_entries.async_entries(DOMAIN) == []
+    assert hass.config_entries.flow.async_progress() == []
+
+    issue = issue_registry.async_get_issue(
+        DOMAIN, "deprecated_yaml_import_issue_cannot_connect"
+    )
+    assert issue is not None
+    assert issue.translation_key == "deprecated_yaml_import_issue"
+    assert (
+        issue_registry.async_get_issue(
+            HOMEASSISTANT_DOMAIN, f"deprecated_yaml_{DOMAIN}"
+        )
+        is None
+    )
+
+    assert hass.states.get("sensor.merton") is None
+    assert hass.states.get("sensor.city_of_london") is None
