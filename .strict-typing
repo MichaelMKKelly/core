@@ -375,6 +375,7 @@ homeassistant.components.local_todo.*
 homeassistant.components.lock.*
 homeassistant.components.logbook.*
 homeassistant.components.logger.*
+homeassistant.components.london_air.*
 homeassistant.components.london_underground.*
 homeassistant.components.lookin.*
 homeassistant.components.lovelace.*
