@@ -2,17 +2,11 @@
 
 from datetime import timedelta
 
-import aiohttp
-
 DOMAIN = "london_air"
 
 CONF_LOCATIONS = "locations"
 
-URL = "https://api.erg.ic.ac.uk/AirQuality/Hourly/MonitoringIndex/GroupName=London/Json"
-
 SCAN_INTERVAL = timedelta(minutes=30)
-
-REQUEST_TIMEOUT = aiohttp.ClientTimeout(total=10)
 
 MANUFACTURER = "Imperial College London"
 

@@ -8,14 +8,6 @@
       "required": "Please select at least one location."
     },
     "step": {
-      "reconfigure": {
-        "data": {
-          "locations": "Locations"
-        },
-        "data_description": {
-          "locations": "Select the London boroughs to track."
-        }
-      },
       "user": {
         "data": {
           "locations": "Locations"
@@ -27,7 +19,7 @@
     }
   },
   "exceptions": {
-    "update_failed": {
+    "config_entry_not_ready": {
       "message": "Error fetching London Air data"
     }
   },

@@ -4,23 +4,23 @@ import asyncio
 from collections.abc import Mapping
 from typing import Any, override
 
-import aiohttp
 import probatio
+from pylondonair import LondonAirClient, LondonAirConnectionError
 
 from homeassistant.config_entries import ConfigEntryState, ConfigFlow, ConfigFlowResult
 from homeassistant.data_entry_flow import AbortFlow
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .const import AUTHORITIES, CONF_LOCATIONS, DOMAIN, REQUEST_TIMEOUT, URL
+from .const import AUTHORITIES, CONF_LOCATIONS, DOMAIN
 
 
 def _import_deadline() -> float:
     """Return the deadline margin for waiting on a concurrent import."""
-    # Two sequential REQUEST_TIMEOUT-bounded requests (connection test and
-    # first refresh) can elapse while the entry stays SETUP_IN_PROGRESS;
-    # add a margin so we do not give up just before the entry is ready.
-    return 2 * (REQUEST_TIMEOUT.total or 10.0) + 5.0
+    # Two sequential 10-second-bounded requests (connection test and first
+    # refresh) can elapse while the entry stays SETUP_IN_PROGRESS; add a
+    # margin so we do not give up just before the entry is ready.
+    return 2 * 10.0 + 5.0
 
 
 class LondonAirConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -30,11 +30,8 @@ class LondonAirConfigFlow(ConfigFlow, domain=DOMAIN):
 
     async def _test_connection(self) -> None:
         """Verify the API is reachable, raising on failure."""
-        response = await async_get_clientsession(self.hass).get(
-            URL, timeout=REQUEST_TIMEOUT
-        )
-        response.raise_for_status()
-        response.release()
+        client = LondonAirClient(session=async_get_clientsession(self.hass))
+        await client.async_test_connection()
 
     def _schema(self, default: list[str]) -> probatio.Schema:
         """Build the locations selection schema."""
@@ -60,7 +57,7 @@ class LondonAirConfigFlow(ConfigFlow, domain=DOMAIN):
                 self._abort_if_unique_id_configured()
                 try:
                     await self._test_connection()
-                except aiohttp.ClientError, TimeoutError:
+                except LondonAirConnectionError:
                     errors["base"] = "cannot_connect"
                 else:
                     return self.async_create_entry(title="London Air", data=user_input)
@@ -84,7 +81,7 @@ class LondonAirConfigFlow(ConfigFlow, domain=DOMAIN):
             return self.async_abort(reason=await self._async_await_creator_outcome())
         try:
             await self._test_connection()
-        except aiohttp.ClientError, TimeoutError:
+        except LondonAirConnectionError:
             return self.async_abort(reason="cannot_connect")
 
         return self.async_create_entry(
@@ -121,34 +118,4 @@ class LondonAirConfigFlow(ConfigFlow, domain=DOMAIN):
                 include_uninitialized=True,
                 match_context={"unique_id": DOMAIN},
             )
-        )
-
-    async def async_step_reconfigure(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
-        """Handle the reconfigure step."""
-        errors: dict[str, str] = {}
-        entry = self._get_reconfigure_entry()
-        if user_input is not None:
-            if not user_input[CONF_LOCATIONS]:
-                errors[CONF_LOCATIONS] = "required"
-            else:
-                try:
-                    await self._test_connection()
-                except aiohttp.ClientError, TimeoutError:
-                    errors["base"] = "cannot_connect"
-                else:
-                    return self.async_update_reload_and_abort(
-                        entry, data_updates=user_input
-                    )
-
-        default = (
-            entry.data[CONF_LOCATIONS]
-            if user_input is None
-            else user_input[CONF_LOCATIONS]
-        )
-        return self.async_show_form(
-            step_id="reconfigure",
-            data_schema=self._schema(default),
-            errors=errors,
         )

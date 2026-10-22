@@ -8,5 +8,6 @@
   "integration_type": "service",
   "iot_class": "cloud_polling",
   "quality_scale": "legacy",
+  "requirements": ["pylondonair==0.1.0"],
   "single_config_entry": true
 }
