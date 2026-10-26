@@ -244,6 +244,10 @@ class TTSCache:
 
         self.last_used = monotonic()
 
+    def get_full_data(self) -> bytes | None:
+        """Return the full data if loaded, else None."""
+        return self._result_data
+
 
 @callback
 def async_default_engine(hass: HomeAssistant) -> str | None:
@@ -850,6 +854,12 @@ class ResultStream:
             yield chunk
 
         self.last_used = monotonic()
+
+    def async_get_full_data(self) -> bytes | None:
+        """Return the full audio if already loaded, else None."""
+        if self._override_media_path is not None or not self._result_cache.done():
+            return None
+        return self._result_cache.result().get_full_data()
 
     def async_override_result(self, media_path: str | Path) -> None:
         """Override the TTS stream with a different media path."""
@@ -1753,6 +1763,12 @@ class TextToSpeechView(HomeAssistantView):
 
         if stream is None:
             return web.Response(status=HTTPStatus.NOT_FOUND)
+
+        # Serve a complete response (with Content-Length) when the full audio is
+        # already available. Some players mishandle chunked responses without a
+        # Content-Length and re-request the URL, causing the speech to repeat.
+        if (full_data := stream.async_get_full_data()) is not None:
+            return web.Response(body=full_data, content_type=stream.content_type)
 
         response: web.StreamResponse | None = None
         try:

@@ -856,6 +856,73 @@ async def test_service_receive_voice(
 
 
 @pytest.mark.parametrize(
+    ("setup", "tts_service", "service_data", "expected_url_suffix"),
+    [
+        (
+            "mock_setup",
+            "test_say",
+            {
+                ATTR_ENTITY_ID: "media_player.something",
+                tts.ATTR_MESSAGE: "There is someone at the door.",
+            },
+            "test",
+        ),
+        (
+            "mock_config_entry_setup",
+            "speak",
+            {
+                ATTR_ENTITY_ID: "tts.test",
+                tts.ATTR_MEDIA_PLAYER_ENTITY_ID: "media_player.something",
+                tts.ATTR_MESSAGE: "There is someone at the door.",
+            },
+            "tts.test",
+        ),
+    ],
+    indirect=["setup"],
+)
+async def test_web_view_complete_response_has_content_length(
+    hass: HomeAssistant,
+    hass_client: ClientSessionGenerator,
+    mock_tts_cache_dir: Path,
+    setup: str,
+    tts_service: str,
+    service_data: dict[str, Any],
+    expected_url_suffix: str,
+) -> None:
+    """A fully loaded TTS result is served with a Content-Length header.
+
+    Some players mishandle chunked responses without a Content-Length and
+    re-request the URL, causing the speech to repeat.
+    """
+    calls = async_mock_service(hass, MP_DOMAIN, SERVICE_PLAY_MEDIA)
+
+    await hass.services.async_call(
+        tts.DOMAIN,
+        tts_service,
+        service_data,
+        blocking=True,
+    )
+    assert len(calls) == 1
+
+    url = await get_media_source_url(hass, calls[0].data[ATTR_MEDIA_CONTENT_ID])
+    await hass.async_block_till_done()
+    client = await hass_client()
+    req = await client.get(url)
+    tts_data = MOCK_DATA
+    tts_data = tts.SpeechManager.write_tags(
+        f"42f18378fd4393d18c8dd11d03fa9563c1e54491_en-us_-_{expected_url_suffix}.mp3",
+        tts_data,
+        "Test",
+        service_data[tts.ATTR_MESSAGE],
+        "en",
+        None,
+    )
+    assert req.status == HTTPStatus.OK
+    assert req.headers.get("Content-Length") == str(len(tts_data))
+    assert await req.read() == tts_data
+
+
+@pytest.mark.parametrize(
     ("mock_provider", "mock_tts_entity"),
     [(MockTTSProvider("de_DE"), MockTTSEntity("de_DE"))],
 )
