@@ -24,6 +24,17 @@ from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.device_registry import DeviceEntryType
 from homeassistant.setup import async_setup_component
 
+API_ERRORS = [
+    pytest.param(
+        LondonAirConnectionError("Request to London Air API failed"),
+        id="connection-error",
+    ),
+    pytest.param(
+        LondonAirUpdateError("Invalid JSON from London Air API"),
+        id="update-error",
+    ),
+]
+
 
 @pytest.mark.usefixtures("setup_entry")
 async def test_valid_state(
@@ -69,19 +80,7 @@ async def test_valid_state(
     assert pollutants[0]["summary"] == "PM10 is Low"
 
 
-@pytest.mark.parametrize(
-    "error",
-    [
-        pytest.param(
-            LondonAirConnectionError("Request to London Air API failed"),
-            id="connection-error",
-        ),
-        pytest.param(
-            LondonAirUpdateError("Invalid JSON from London Air API"),
-            id="update-error",
-        ),
-    ],
-)
+@pytest.mark.parametrize("error", API_ERRORS)
 async def test_api_failure(
     hass: HomeAssistant,
     error: LondonAirConnectionError | LondonAirUpdateError,
@@ -103,19 +102,7 @@ async def test_api_failure(
     assert hass.states.get("sensor.merton_air_quality") is None
 
 
-@pytest.mark.parametrize(
-    "error",
-    [
-        pytest.param(
-            LondonAirConnectionError("Request to London Air API failed"),
-            id="connection-error",
-        ),
-        pytest.param(
-            LondonAirUpdateError("Invalid JSON from London Air API"),
-            id="update-error",
-        ),
-    ],
-)
+@pytest.mark.parametrize("error", API_ERRORS)
 async def test_update_failure_keeps_last_data(
     hass: HomeAssistant,
     error: LondonAirConnectionError | LondonAirUpdateError,
