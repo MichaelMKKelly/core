@@ -128,6 +128,8 @@ async def test_update_failure_keeps_last_data(
     assert state is not None
     assert state.state == "Low"
 
+    data_before = setup_entry.runtime_data.data
+
     mock_london_air_client.async_update.side_effect = error
     freezer.tick(SCAN_INTERVAL)
     async_fire_time_changed(hass)
@@ -137,7 +139,7 @@ async def test_update_failure_keeps_last_data(
     state = hass.states.get("sensor.merton_air_quality")
     assert state is not None
     assert state.state == STATE_UNAVAILABLE
-    assert setup_entry.runtime_data.data is not None
+    assert setup_entry.runtime_data.data is data_before
 
 
 @pytest.mark.parametrize(
